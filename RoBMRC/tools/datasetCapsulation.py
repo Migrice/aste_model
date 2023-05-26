@@ -3,12 +3,15 @@ import numpy as np
 
 
 class QueryAndAnswer:
-    def __init__(self, line, forward_asp_query, forward_asp_prob, forward_asp_neg_prob, forward_opi_query,
+    def __init__(self, line, forward_asp_query, forward_asp_prob, forward_asp_neg_prob, 
+forward_aspect_prob,
+forward_opi_query,forward_opinion_prob,
                  forward_asp_query_mask, forward_asp_query_seg,
                  forward_opi_query_mask, forward_opi_query_seg,
                  forward_asp_answer_start, forward_asp_answer_end,
                  forward_opi_answer_start, forward_opi_answer_end,
-                 backward_asp_query, backward_opi_query, backward_opi_prob, backward_opi_neg_prob,
+                 backward_asp_query, backward_aspect_prob, backward_opi_query, backward_opi_prob, 
+                 backward_opi_neg_prob,backward_opinion_prob,
                  backward_asp_answer_start, backward_asp_answer_end,
                  backward_asp_query_mask, backward_asp_query_seg,
                  backward_opi_query_mask, backward_opi_query_seg,
@@ -19,7 +22,9 @@ class QueryAndAnswer:
         self.forward_asp_query = forward_asp_query
         self.forward_asp_prob = forward_asp_prob
         self.forward_asp_neg_prob = forward_asp_neg_prob
+        self.forward_aspect_prob = forward_aspect_prob
         self.forward_opi_query = forward_opi_query
+        self.forward_opinion_prob = forward_opinion_prob
         self.forward_asp_query_mask = forward_asp_query_mask
         self.forward_asp_query_seg = forward_asp_query_seg
         self.forward_opi_query_mask = forward_opi_query_mask
@@ -29,9 +34,11 @@ class QueryAndAnswer:
         self.forward_opi_answer_start = forward_opi_answer_start
         self.forward_opi_answer_end = forward_opi_answer_end
         self.backward_asp_query = backward_asp_query
+        self.backward_aspect_prob = backward_aspect_prob
         self.backward_opi_query = backward_opi_query
         self.backward_opi_prob = backward_opi_prob
         self.backward_opi_neg_prob = backward_opi_neg_prob
+        self.backward_opinion_prob = backward_opinion_prob
         self.backward_asp_query_mask = backward_asp_query_mask
         self.backward_asp_query_seg = backward_asp_query_seg
         self.backward_opi_query_mask = backward_opi_query_mask
@@ -69,7 +76,9 @@ class ReviewDataset(Dataset):
             'forward_asp_query': np.array(self.dataset[item].forward_asp_query),
             'forward_asp_prob': np.array(self.dataset[item].forward_asp_prob),
             'forward_asp_neg_prob': np.array(self.dataset[item].forward_asp_neg_prob),
+            'forward_aspect_prob': np.array(self.dataset[item].forward_aspect_prob),
             'forward_opi_query': np.array(self.dataset[item].forward_opi_query),
+            'forward_opinion_prob' : np.array(self.dataset[item].forward_opinion_prob),
             'forward_asp_query_mask': np.array(self.dataset[item].forward_asp_query_mask),
             'forward_opi_query_mask': np.array(self.dataset[item].forward_opi_query_mask),
             'forward_asp_query_seg': np.array(self.dataset[item].forward_asp_query_seg),
@@ -79,9 +88,11 @@ class ReviewDataset(Dataset):
             'forward_opi_answer_start': np.array(self.dataset[item].forward_opi_answer_start),
             'forward_opi_answer_end': np.array(self.dataset[item].forward_opi_answer_end),
             'backward_asp_query': np.array(self.dataset[item].backward_asp_query),
+            'backward_aspect_prob': np.array(self.dataset[item].backward_aspect_prob),
             'backward_opi_query': np.array(self.dataset[item].backward_opi_query),
             'backward_opi_prob': np.array(self.dataset[item].backward_opi_prob),
             'backward_opi_neg_prob': np.array(self.dataset[item].backward_opi_neg_prob),
+            'backward_opinion_prob': np.array(self.dataset[item].backward_opinion_prob),
             'backward_asp_query_mask': np.array(self.dataset[item].backward_asp_query_mask),
             'backward_opi_query_mask': np.array(self.dataset[item].backward_opi_query_mask),
             'backward_asp_query_seg': np.array(self.dataset[item].backward_asp_query_seg),

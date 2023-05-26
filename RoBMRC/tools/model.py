@@ -7,7 +7,6 @@ class BERTModel(nn.Module):
 
         super(BERTModel, self).__init__()
 
-        # BERT模型
         if bert_model_type == 'bert-base-uncased':
             self.bert = BertModel.from_pretrained(bert_model_type)
             print('bert-base-uncased model loaded')
