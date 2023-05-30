@@ -5,7 +5,7 @@ from stanfordcorenlp import StanfordCoreNLP
 sent = ['[CLS]', 'what', 'aspects', '?', '[SEP]', 'the', 'food', 'is', 'very', 'average', '.', '.', '.', 'the', 'thai', 'fusion', 'stuff', 'is', 'a', 'bit', 'too', 'sweet', ',', 'every', 'thing', 'they', 'serve', 'is', 'too', 'sweet', 'here', '.', '[PAD]',
        '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]']
 
-#nlp = StanfordCoreNLP('http://localhost', port=9000)
+nlp = StanfordCoreNLP('http://localhost', port=9000)
 
 sentences = [101, 2054, 5448, 2445, 1996, 7814, 2173, 1029, 102, 13325, 2013, 3025,
              8466, 2023, 2109, 2000, 2022, 1037, 2204, 2173, 1010, 2021, 2025, 2151, 2936, 1012]

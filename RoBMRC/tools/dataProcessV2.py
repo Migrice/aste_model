@@ -5,6 +5,7 @@ from transformers import BertTokenizer
 from stanfordcorenlp import StanfordCoreNLP
 import torch
 import probability
+import all_dependancy
 
 nlp = StanfordCoreNLP('http://localhost', port=9000)
 
@@ -22,8 +23,7 @@ forward_opinion_query_template = [
 backward_opinion_query_template = ["[CLS]", "what", "opinions", "?", "[SEP]"]
 backward_aspect_query_template = [
     "[CLS]", "what", "aspect", "does", "the", "opinion", "describe", "?", "[SEP]"]
-sentiment_query_template = ["[CLS]", "what", "sentiment", "given", "the", "aspect", "and", "the", "opinion", "?",
-                            "[SEP]"]
+sentiment_query_template = ["[CLS]", "what", "sentiment", "given", "the", "aspect", "and", "the", "opinion", "?", "[SEP]"]
 
 # BertTokenizer
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
@@ -35,6 +35,8 @@ sentiments_mapping = {
 }
 
 positive_aspects_tag_prob, negative_aspects_tag_prob, positive_opinions_tag_prob, negative_opinions_tag_prob, aspects_tag_set, opinion_tag_set = probability.data_get_tags()
+
+aspect_roles_set, asp_roles_prob, opinions_roles_set, opinion_roles_prob = all_dependancy.data_get_roles()
 
 
 def print_QA(QA: Data.QueryAndAnswer):
@@ -394,68 +396,69 @@ def get_start_end(str_list):
 def preprocess(sen):
     sente = " ".join(sen)
     a = re.sub('\##', '', sente)
-    se = a.replace('.', ' se ')
-    ses = se.replace('+', ' se ')
+    se = a.replace('.', 'se')
+    ses = se.replace('+', 'se')
     return ses
 
 
-def get_obj_with_rel(word_list, is_aspect):
-    sen = ' '.join(word_list)
-    new_sen = word_list
-    sentenseTags = nlp.pos_tag(sen)
-    aspect_opinion_rel = ["JJ-amod-NNS", "NN-nsubj-JJR",
-                          "NN-nsubj-JJ", "NNS-nsubj-JJ", "NN-nsubj-JJS"]
-    aspects_tags = ["NN", "NNS"]
-    opinion_tags = ["JJ", "JJR", "JJS"]
-    dependency = nlp.dependency_parse(sen)
-    #print("dep", dependency)
+# def get_obj_with_rel(word_list, is_aspect):
+#     sen = ' '.join(word_list)
+#     new_sen = word_list
+#     sentenseTags = nlp.pos_tag(sen)
+#     aspect_opinion_rel = ["JJ-amod-NNS", "NN-nsubj-JJR",
+#                           "NN-nsubj-JJ", "NNS-nsubj-JJ", "NN-nsubj-JJS"]
+#     aspects_tags = ["NN", "NNS"]
+#     opinion_tags = ["JJ", "JJR", "JJS"]
+#     dependency = nlp.dependency_parse(sen)
+#     #print("dep", dependency)
 
-    aspects = []
-    opinions = []
-    for dependance in dependency:
-        role = (dependance[0]).lower()
-        cible = dependance[1]-1
-        mot = dependance[2]-1
+#     aspects = []
+#     opinions = []
+#     for dependance in dependency:
+#         role = (dependance[0]).lower()
+#         cible = dependance[1]-1
+#         mot = dependance[2]-1
 
-        full_role = str(sentenseTags[mot][1]) + "-" + \
-            role + "-" + str(sentenseTags[cible][1])
+#         full_role = str(sentenseTags[mot][1]) + "-" + \
+#             role + "-" + str(sentenseTags[cible][1])
 
-        if full_role in aspect_opinion_rel:
-            #print(full_role)
-            tag_list = [sentenseTags[mot], sentenseTags[cible]]
+#         if full_role in aspect_opinion_rel:
+#             #print(full_role)
+#             tag_list = [sentenseTags[mot], sentenseTags[cible]]
 
-            for i in range(len(tag_list)):
-                if tag_list[i][1] in aspects_tags:
-                    aspects.append(tag_list[i][0])
-                else:
-                    opinions.append(tag_list[i][0])
+#             for i in range(len(tag_list)):
+#                 if tag_list[i][1] in aspects_tags:
+#                     aspects.append(tag_list[i][0])
+#                 else:
+#                     opinions.append(tag_list[i][0])
 
-    #print("opinions",opinions)
-    index_list = []
-    if is_aspect == 'aspect':
-        for i in range(len(new_sen)):
-            if new_sen[i] in aspects:
-                index_list.append(i)
-    else:
-        for i in range(len(new_sen)):
-            if new_sen[i] in opinions:
-                index_list.append(i)
-    return index_list
+#     #print("opinions",opinions)
+#     index_list = []
+#     if is_aspect == 'aspect':
+#         for i in range(len(new_sen)):
+#             if new_sen[i] in aspects:
+#                 index_list.append(i)
+#     else:
+#         for i in range(len(new_sen)):
+#             if new_sen[i] in opinions:
+#                 index_list.append(i)
+#     return index_list
 
-
-def get_restrictive_rel(ok_start_token, aspect_list):
+#TO DO ponctuation 
+def get_restrictive_rel(ok_start_token, aspect_list, role_set, roles_prob):
     sent = ' '.join(ok_start_token)
-    sena = sent[:-1]
-    new_sen = ok_start_token
+    #sena = sent[:-1]
+    sena = preprocess(ok_start_token)
+    new_sen = sena.split(" ")
+
+    #print(new_sen)
     sentenseTags = nlp.pos_tag(sena)
-    aspect_opinion_rel = ["JJ-amod-NNS", "NN-nsubj-JJR",
-                          "NN-nsubj-JJ", "NNS-nsubj-JJ", "NN-nsubj-JJS", "RB-advmod-JJ"]
-    aspects_tags = ["NN", "NNS"]
-    opinion_tags = ["JJ", "JJR", "JJS"]
+    #print(sentenseTags)
+  
     dependency = nlp.dependency_parse(sena)
     #print("dep", dependency)
-    aspects = []
     opinions = []
+    word_and_prob = []
     rep = []
     for dependance in dependency:
         word = {}
@@ -468,41 +471,64 @@ def get_restrictive_rel(ok_start_token, aspect_list):
         word['mot'] = sentenseTags[mot][0]
         word['cible'] = sentenseTags[cible][0]
         word['role'] = full_role
-
+        
         for i in range(len(aspect_list)):
             if ((sentenseTags[mot][0] == aspect_list[i])):
-                opinions.append(sentenseTags[cible][0])
+                if full_role in role_set:
+                    opinions.append(sentenseTags[cible][0])
+                    word_cible = {}
+                    word_cible["mot"] = sentenseTags[mot][0]
+                    word_cible["cible"] = sentenseTags[cible][0]
+                    word_cible["prob"] = roles_prob[full_role]
+                    word_cible["indice"] = new_sen.index(sentenseTags[cible][0])
+                    word_and_prob.append(word_cible)
+                    #print(word_cible)
             rep.append(word)
         index_list = []
         for i in range(len(new_sen)):
             if new_sen[i] in opinions:
                 index_list.append(i)
-    return opinions, index_list
+    return word_and_prob, index_list
 
 
 def make_QA(line, word_list, aspect_list, opinion_list, sentiment_list):
+    print(word_list)
     forward_asp_query = forward_aspect_query_template + word_list
     line_prop = preprocess(word_list)
+    line_un_process = line_prop.split(" ")
     sentence_pos = nlp.pos_tag(line_prop)
+    sentence_dependancy_parse = nlp.dependency_parse(line_prop)
     #assert (len(word_list)) == len(sentence_pos)
     asp_prob_template = [0] * len(forward_aspect_query_template)
     asp_prop_sen = [0] * len(word_list)
 
     neg_asp_template = [1] * len(forward_aspect_query_template)
     neg_asp_prop_sen = [0] * len(word_list)
-
+    
+    # Probabilités des aspects en fonction du POS-tagging
     for i in range(0, len(sentence_pos)-1):
         if sentence_pos[i][1] in aspects_tag_set:
             asp_prop_sen[i] = positive_aspects_tag_prob[sentence_pos[i][1]]
             neg_asp_prop_sen[i] = negative_aspects_tag_prob[sentence_pos[i][1]]
     forward_asp_prob = asp_prob_template + asp_prop_sen
     forward_asp_neg_prob = neg_asp_template + neg_asp_prop_sen
-
+    
+    #Probabilités des aspects en fonction des relations grammaticales
     aspect_prob_sen = [0] * len(word_list)
-    aspect_positions = get_obj_with_rel(word_list, "aspect")
-
-    for i in aspect_positions:
-        aspect_prob_sen[i] = 0.9
+    for dependance in sentence_dependancy_parse:
+        word = {}
+        role = (dependance[0]).lower()
+        cible = dependance[1]-1
+        mot = dependance[2]-1
+        full_role = str(sentence_pos[mot][1]) + "-" + \
+            role + "-" + str(sentence_pos[cible][1])
+        if full_role in aspect_roles_set :
+            word["mot"] = sentence_pos[mot][0]
+            word["prob"] = asp_roles_prob[full_role]
+            for i in range(len(line_un_process)):
+                if word["mot"] == line_un_process[i]:
+                    aspect_prob_sen[i] = asp_roles_prob[full_role]    
+   
     forward_aspect_prob = asp_prob_template + aspect_prob_sen
 
     forward_asp_query_mask = [1] * len(forward_asp_query)
@@ -530,6 +556,7 @@ def make_QA(line, word_list, aspect_list, opinion_list, sentiment_list):
     neg_opi_pos_prob_template = [1] * len(backward_opinion_query_template)
     neg_opi_pos_prob_sen = [0] * len(word_list)
 
+    #probablités des opinions en fonction de l'étiquetage morphosyntaxique
     for i in range(0, len(sentence_pos)-1):
         if sentence_pos[i][1] in opinion_tag_set:
             opi_pos_prob_sen[i] = positive_opinions_tag_prob[sentence_pos[i][1]]
@@ -539,10 +566,21 @@ def make_QA(line, word_list, aspect_list, opinion_list, sentiment_list):
     backward_opi_neg_prob = neg_opi_pos_prob_template + neg_opi_pos_prob_sen
 
     opinion_prob_sen = [0] * len(word_list)
-    opinions_positions = get_obj_with_rel(word_list, "opinions")
-
-    for i in opinions_positions:
-        opinion_prob_sen[i] = 0.9
+    
+    # Probabilités des opinions en fonction des relations grammaticales
+    for dependance in sentence_dependancy_parse:
+        word = {}
+        role = (dependance[0]).lower()
+        cible = dependance[1]-1
+        mot = dependance[2]-1
+        full_role = str(sentence_pos[mot][1]) + "-" + \
+            role + "-" + str(sentence_pos[cible][1])
+        if full_role in opinions_roles_set:
+            word["mot"] = sentence_pos[mot][0]
+            for i in range(len(line_un_process)):
+                if word["mot"] == line_un_process[i]:
+                    opinion_prob_sen[i] = opinion_roles_prob[full_role]
+    
     backward_opinion_prob = opi_pos_prob_template + opinion_prob_sen
 
     backward_opi_query_mask = [1] * len(backward_opi_query)
@@ -583,10 +621,14 @@ def make_QA(line, word_list, aspect_list, opinion_list, sentiment_list):
                                  forward_opinion_query_template[6:])
         opi_sentence = [0] * len(word_list)
 
-        opin_list, opi_indexes = get_restrictive_rel(word_list, aspect)
-        for i in opi_indexes:
-            opi_sentence[i] = 0.9
+        opin_list, opi_indexes = get_restrictive_rel(
+            word_list, aspect, aspect_roles_set, asp_roles_prob)
+        #print("forward_opi",opin_list)
+        if (opin_list):
+            for i in range(len(opin_list)):
+                opi_sentence[opin_list[i].get("indice")] = opin_list[i].get("prob")
         opi_vector = opi_template + opi_sentence
+        #print("for_prob",opi_sentence)
         forward_opinion_prob.append(opi_vector)
 
         forward_asp_answer_start[len(
@@ -624,12 +666,15 @@ def make_QA(line, word_list, aspect_list, opinion_list, sentiment_list):
                                  backward_aspect_query_template[6:])
         asp_sentence = [0] * len(word_list)
 
-        asp_list, aspect_indexes = get_restrictive_rel(word_list, opinion)
-        for i in aspect_indexes:
-            asp_sentence[i] = 0.9
+        asp_list, aspect_indexes = get_restrictive_rel(word_list, opinion, opinions_roles_set, opinion_roles_prob)
+        #print("backward_aspect", asp_list)
+        if asp_list:
+            for i in range(len(asp_list)):
+                asp_sentence[asp_list[i].get("indice")] = asp_list[i].get("prob")
+        #print("prob_vector",asp_sentence )
         asp_vector = asp_template + asp_sentence
+        
         backward_aspect_prob.append(asp_vector)
-
 
         asp_query_temp = backward_aspect_query_template[0:6] + word_list[opi[0]:opi[1] + 1] + \
             backward_aspect_query_template[6:] + word_list
