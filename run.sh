@@ -9,8 +9,5 @@ pip install stanfordcorenlp==3.9.1.1
 
 cd RoBMRC/
 
-echo "Preprocess Data"
-python ./tools/dataProcessV2.py
-
 echo "Begin Training"
 python ./tools/main.py --mode train 
