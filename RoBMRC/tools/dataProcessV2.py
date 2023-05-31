@@ -41,7 +41,7 @@ aspect_roles_set, asp_roles_prob, opinions_roles_set, opinion_roles_prob = all_d
 
 def print_QA(QA: Data.QueryAndAnswer):
     print('*' * 100)
-    print(QA.line, '\n',
+    print(QA.line, '\n', QA.sentence_representation, '\n',
           ids_to_tokens(QA.forward_asp_query), '\n', QA.forward_aspect_prob, '\n', QA.forward_asp_prob, '\n',  QA.forward_asp_neg_prob, '\n',  ids_to_tokens(
               QA.forward_opi_query), '\n', QA.forward_opinion_prob, '\n',
           QA.forward_asp_query_mask, '\n', QA.forward_asp_query_seg, '\n',
@@ -157,6 +157,7 @@ def tokens_to_ids(QA_list):
 
 def list_to_object(dataset_object):
     line = []
+    sentence_representation = []
     forward_asp_query = []
     forward_asp_prob = []
     forward_asp_neg_prob = []
@@ -191,6 +192,7 @@ def list_to_object(dataset_object):
     sentiment_query_seg = []
     for QA in dataset_object:
         line.append(QA.line)
+        sentence_representation.append(QA.sentence_representation)
         forward_asp_query.append(QA.forward_asp_query)
         forward_asp_prob.append(QA.forward_asp_prob)
         forward_asp_neg_prob.append(QA.forward_asp_neg_prob)
@@ -225,6 +227,7 @@ def list_to_object(dataset_object):
         sentiment_query_seg.append(QA.sentiment_query_seg)
 
     return Data.QueryAndAnswer(line=line,
+                               sentence_representation=sentence_representation,
                                forward_asp_query=forward_asp_query,
                                forward_asp_prob=forward_asp_prob,
                                forward_asp_neg_prob=forward_asp_neg_prob,
@@ -269,7 +272,7 @@ def dataset_align(dataset_object, max_tokens_len, max_aspect_num):
             tokenized_QA.forward_asp_prob.extend(
                 [0] * (max_tokens_len - len(tokenized_QA.forward_asp_prob)))
             tokenized_QA.forward_asp_neg_prob.extend(
-                [1] * (max_tokens_len - len(tokenized_QA.forward_asp_neg_prob)))
+                [0] * (max_tokens_len - len(tokenized_QA.forward_asp_neg_prob)))
             tokenized_QA.forward_aspect_prob.extend(
                 [0] * (max_tokens_len - len(tokenized_QA.forward_aspect_prob)))
             tokenized_QA.forward_asp_query_mask.extend(
@@ -302,7 +305,7 @@ def dataset_align(dataset_object, max_tokens_len, max_aspect_num):
             tokenized_QA.backward_opi_prob.extend(
                 [0] * (max_tokens_len - len(tokenized_QA.backward_opi_prob)))
             tokenized_QA.backward_opi_neg_prob.extend(
-                [1] * (max_tokens_len - len(tokenized_QA.backward_opi_neg_prob)))
+                [0] * (max_tokens_len - len(tokenized_QA.backward_opi_neg_prob)))
             tokenized_QA.backward_opinion_prob.extend(
                 [0] * (max_tokens_len - len(tokenized_QA.backward_opinion_prob)))
             tokenized_QA.backward_opi_query_mask.extend(
@@ -490,19 +493,42 @@ def get_restrictive_rel(ok_start_token, aspect_list, role_set, roles_prob):
                 index_list.append(i)
     return word_and_prob, index_list
 
+def get_sentence_representation(pos_tag, dependancy_parse):
+    sentenseTags = pos_tag
+    dependency = dependancy_parse
+    sentence_representation = []
+    for dependance in dependency:
+        word = {}
+        role = (dependance[0]).lower()
+        cible = dependance[1]-1
+        mot = dependance[2]-1
+        full_role = str(sentenseTags[mot][1]) + "-" + \
+            role + "-" + str(sentenseTags[cible][1])
+        word['mot'] = sentenseTags[mot][0]
+        word['cible'] = sentenseTags[cible][0]
+        word['full_role'] = full_role
+        if full_role in aspect_roles_set:
+            word['forward_opinion_prob'] = asp_roles_prob[full_role]
+        if full_role in opinions_roles_set:
+            word['backward_aspect_prob'] = opinion_roles_prob[full_role]
+        sentence_representation.append(word)
+    return sentence_representation
+
 
 def make_QA(line, word_list, aspect_list, opinion_list, sentiment_list):
-    print(word_list)
+    #print(word_list)
     forward_asp_query = forward_aspect_query_template + word_list
     line_prop = preprocess(word_list)
     line_un_process = line_prop.split(" ")
     sentence_pos = nlp.pos_tag(line_prop)
     sentence_dependancy_parse = nlp.dependency_parse(line_prop)
+    sentence_representation = get_sentence_representation(
+        sentence_pos, sentence_dependancy_parse)
     #assert (len(word_list)) == len(sentence_pos)
     asp_prob_template = [0] * len(forward_aspect_query_template)
     asp_prop_sen = [0] * len(word_list)
 
-    neg_asp_template = [1] * len(forward_aspect_query_template)
+    neg_asp_template = [0] * len(forward_aspect_query_template)
     neg_asp_prop_sen = [0] * len(word_list)
     
     # Probabilités des aspects en fonction du POS-tagging
@@ -553,7 +579,7 @@ def make_QA(line, word_list, aspect_list, opinion_list, sentiment_list):
     opi_pos_prob_template = [0] * len(backward_opinion_query_template)
     opi_pos_prob_sen = [0] * len(word_list)
 
-    neg_opi_pos_prob_template = [1] * len(backward_opinion_query_template)
+    neg_opi_pos_prob_template = [0] * len(backward_opinion_query_template)
     neg_opi_pos_prob_sen = [0] * len(word_list)
 
     #probablités des opinions en fonction de l'étiquetage morphosyntaxique
@@ -718,6 +744,7 @@ def make_QA(line, word_list, aspect_list, opinion_list, sentiment_list):
     assert len(forward_opinion_prob) == len(forward_opi_query)
 
     return Data.QueryAndAnswer(line=line,
+                               sentence_representation=sentence_representation,
                                forward_asp_query=forward_asp_query,
                                forward_asp_prob=forward_asp_prob,
                                forward_asp_neg_prob=forward_asp_neg_prob,

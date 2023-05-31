@@ -10,7 +10,6 @@ import math
 import os
 from stanfordcorenlp import StanfordCoreNLP
 
-nlp = StanfordCoreNLP('http://localhost', port=9000)
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
@@ -51,88 +50,42 @@ tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 #                 end_index.append(target_list_index[i])
 #     return start_index, end_index
 
-def get_obj_with_rel(ok_start_token, is_aspect):
-    tokenized_sen = tokenizer.convert_ids_to_tokens(ok_start_token)
-    sen = ' '.join(tokenized_sen)
-    new_sen = tokenizer.convert_ids_to_tokens(ok_start_token)
-    sentenseTags = nlp.pos_tag(sen)
-    aspect_opinion_rel = ["JJ-amod-NNS", "NN-nsubj-JJR",
-                          "NN-nsubj-JJ", "NNS-nsubj-JJ", "NN-nsubj-JJS"]
-    aspects_tags = ["NN", "NNS"]
-    opinion_tags = ["JJ", "JJR", "JJS"]
-    dependency = nlp.dependency_parse(sen)
-    #print("dep", dependency)
 
-    aspects = []
-    opinions = []
-    for dependance in dependency:
-        role = (dependance[0]).lower()
-        cible = dependance[1]-1
-        mot = dependance[2]-1
-
-        full_role = str(sentenseTags[mot][1]) + "-" + \
-            role + "-" + str(sentenseTags[cible][1])
-
-        if full_role in aspect_opinion_rel:
-            #print(full_role)
-            tag_list = [sentenseTags[mot], sentenseTags[cible]]
-            
-
-            for i in range(len(tag_list)):
-                if tag_list[i][1] in aspects_tags:
-                    aspects.append(tag_list[i][0])
-                else:
-                    opinions.append(tag_list[i][0])
-
-    #print("opinions",opinions)
-    index_list = []
-    if is_aspect == 'aspect':
-        for i in range(len(new_sen)):
-            if new_sen[i] in aspects:
-                index_list.append(i+5)
-    else:
-        for i in range(len(new_sen)):
-            if new_sen[i] in opinions:
-                index_list.append(i+5)
-    return index_list
+def get_restrictive_forward_opinion(ok_start_tokens,sentence_representation, aspects_list):
+    sentence = tokenizer.convert_ids_to_tokens(ok_start_tokens)
+    cible_list = []
+    vector_prob_output = [0] * len(ok_start_tokens)
+    for i in range(len(sentence_representation)):
+        if sentence_representation[i].get("mot") in aspects_list:
+            if sentence_representation[i].get("forward_opinion_prob"):
+                cible_list.append(sentence_representation[i].get("cible"))
+    
+    for i in range(len(sentence)):
+        if sentence[i] in cible_list:
+            for j in range(len(sentence_representation)):
+                if sentence[i] == sentence_representation[j].get("cible"):
+                    vector_prob_output[i] = sentence_representation[j].get(
+                        "forward_opinion_prob")
+    return vector_prob_output
 
 
-def get_restrictive_rel(ok_start_token, aspect_list):
-    tokenized_sen = tokenizer.convert_ids_to_tokens(ok_start_token)
-    sent = ' '.join(tokenized_sen)
-    sena = sent[:-1]
-    new_sen = tokenizer.convert_ids_to_tokens(ok_start_token)
-    sentenseTags = nlp.pos_tag(sena)
-    aspect_opinion_rel = ["JJ-amod-NNS", "NN-nsubj-JJR",
-                          "NN-nsubj-JJ", "NNS-nsubj-JJ", "NN-nsubj-JJS", "RB-advmod-JJ"]
-    aspects_tags = ["NN", "NNS"]
-    opinion_tags = ["JJ", "JJR", "JJS"]
-    dependency = nlp.dependency_parse(sena)
-    #print("dep", dependency)
-    aspects = []
-    opinions = []
-    rep = []
-    for dependance in dependency:
-        word = {}
-        role = (dependance[0]).lower()
-        cible = dependance[1]-1
-        mot = dependance[2]-1
+def get_restrictive_backward_aspect(ok_start_tokens, sentence_representation, opinion_list):
+    sentence = tokenizer.convert_ids_to_tokens(ok_start_tokens)
+    cible_list = []
+    vector_prob_output = [0] * len(ok_start_tokens)
+    for i in range(len(sentence_representation)):
+        if sentence_representation[i].get("mot") in opinion_list:
+            if sentence_representation[i].get("backward_aspect_prob"):
+                cible_list.append(sentence_representation[i].get("cible"))
 
-        full_role = str(sentenseTags[mot][1]) + "-" + \
-            role + "-" + str(sentenseTags[cible][1])
-        word['mot'] = sentenseTags[mot][0]
-        word['cible'] = sentenseTags[cible][0]
-        word['role'] = full_role
+    for i in range(len(sentence)):
+        if sentence[i] in cible_list:
+            for j in range(len(sentence_representation)):
+                if sentence[i] == sentence_representation[j].get("cible"):
+                    vector_prob_output[i] = sentence_representation[j].get(
+                        "backward_aspect_prob")
+    return vector_prob_output
 
-        for i in range(len(aspect_list)):
-            if ((sentenseTags[mot][0] == aspect_list[i])):
-                opinions.append(sentenseTags[cible][0])
-            rep.append(word)
-        index_list = []
-        for i in range(len(new_sen)):
-            if new_sen[i] in opinions:
-                index_list.append(i)
-    return opinions, index_list
 
 
 def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_len):
@@ -253,12 +206,19 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
             opinion_query.append(tokenizer.convert_tokens_to_ids('[SEP]'))
             opinion_query_seg = [0] * len(opinion_query)
             f_opi_length = len(opinion_query)
+            
+            sentence_representation = batch_dict['sentence_representation'][0]
+            forward_opi_template = [0] * len(opinion_query)
+            forward_opi_prob = get_restrictive_forward_opinion(ok_start_tokens,
+                sentence_representation, aspects_list)
+            
+            forward_opinion_prob = forward_opi_template + forward_opi_prob
+                    
+            # opinions, indexes = get_restrictive_rel(
+            #     ok_start_tokens, aspects_list)
 
-            opinions, indexes = get_restrictive_rel(
-                ok_start_tokens, aspects_list)
-
-            for i in range(len(indexes)):
-                indexes[i] += len(opinion_query)
+            # for i in range(len(indexes)):
+            #     indexes[i] += len(opinion_query)
 
             opinion_query = torch.tensor(opinion_query).long()
             #print("opinion_query_tensor", opinion_query)
@@ -281,10 +241,11 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
 
             f_opi_start_scores, f_opi_end_scores = model(
                 opinion_query, opinion_query_mask, opinion_query_seg, 'AO')
-            if indexes:
-                for i in range(len(f_opi_start_scores)):
-                    for j in indexes:
-                        f_opi_start_scores[i][j][1] += 0.9
+            
+            for i in range(len(f_opi_start_scores)):
+                    for j in range(len(f_opi_start_scores[0])):
+                        f_opi_start_scores[i][j][1] += forward_opinion_prob[j]
+            
             f_opi_start_scores = F.softmax(f_opi_start_scores[0], dim=1)
             f_opi_end_scores = F.softmax(f_opi_end_scores[0], dim=1)
             f_opi_start_prob, f_opi_start_ind = torch.max(
@@ -368,18 +329,25 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
             b_opi_start_prob_temp, b_opi_end_prob_temp, b_opi_start_index_temp, b_opi_end_index_temp, max_len)
 
         for start_index in range(len(b_opi_start_index)):
+            opinion_list = []
             aspect_query = tokenizer.convert_tokens_to_ids(
                 [word.lower() if word not in ['[CLS]', '[SEP]'] else word for word in
                  '[CLS] What aspect does the opinion'.split(' ')])
             for j in range(b_opi_start_index[start_index], b_opi_end_index[start_index] + 1):
                 aspect_query.append(
                     batch_dict['backward_opi_query'][0][j].item())
+                opinion_list.append(tokenizer.convert_ids_to_tokens(
+                    batch_dict['backward_opi_query'][0][j].item()))
             aspect_query.append(tokenizer.convert_tokens_to_ids('describe'))
             aspect_query.append(tokenizer.convert_tokens_to_ids('?'))
             aspect_query.append(tokenizer.convert_tokens_to_ids('[SEP]'))
             aspect_query_seg = [0] * len(aspect_query)
             b_asp_length = len(aspect_query)
             aspect_query = torch.tensor(aspect_query).long()
+            
+            back_asp_prob = get_restrictive_backward_aspect(ok_start_tokens, sentence_representation,opinion_list)
+            backward_aspect_prob = aspect_query_seg + back_asp_prob
+            
             if gpu:
                 aspect_query = aspect_query.cuda()
             aspect_query = torch.cat(
@@ -396,6 +364,10 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
 
             b_asp_start_scores, b_asp_end_scores = model(
                 aspect_query, aspect_query_mask, aspect_query_seg, 'OA')
+            
+            for i in range(len(b_asp_start_scores)):
+                    for j in range(len(b_asp_start_scores[0])):
+                        b_asp_start_scores[i][j][1] += backward_aspect_prob[j]
 
             b_asp_start_scores = F.softmax(b_asp_start_scores[0], dim=1)
             b_asp_end_scores = F.softmax(b_asp_end_scores[0], dim=1)

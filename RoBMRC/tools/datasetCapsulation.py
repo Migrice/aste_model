@@ -3,7 +3,7 @@ import numpy as np
 
 
 class QueryAndAnswer:
-    def __init__(self, line, forward_asp_query, forward_asp_prob, forward_asp_neg_prob, 
+    def __init__(self, line, sentence_representation, forward_asp_query, forward_asp_prob, forward_asp_neg_prob, 
 forward_aspect_prob,
 forward_opi_query,forward_opinion_prob,
                  forward_asp_query_mask, forward_asp_query_seg,
@@ -19,6 +19,7 @@ forward_opi_query,forward_opinion_prob,
                  sentiment_query, sentiment_answer,
                  sentiment_query_mask, sentiment_query_seg):
         self.line = line
+        self.sentence_representation = sentence_representation
         self.forward_asp_query = forward_asp_query
         self.forward_asp_prob = forward_asp_prob
         self.forward_asp_neg_prob = forward_asp_neg_prob
@@ -73,6 +74,7 @@ class ReviewDataset(Dataset):
     def __getitem__(self, item):
         dataset_to_numpy_array = {
             'line': self.dataset[item].line,
+            'sentence_representation': self.dataset[item].sentence_representation,
             'forward_asp_query': np.array(self.dataset[item].forward_asp_query),
             'forward_asp_prob': np.array(self.dataset[item].forward_asp_prob),
             'forward_asp_neg_prob': np.array(self.dataset[item].forward_asp_neg_prob),
