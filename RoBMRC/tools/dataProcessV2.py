@@ -41,7 +41,7 @@ aspect_roles_set, asp_roles_prob, opinions_roles_set, opinion_roles_prob = all_d
 
 def print_QA(QA: Data.QueryAndAnswer):
     print('*' * 100)
-    print(QA.line, '\n', QA.sentence_representation, '\n',
+    print(QA.line, '\n',
           ids_to_tokens(QA.forward_asp_query), '\n', QA.forward_aspect_prob, '\n', QA.forward_asp_prob, '\n',  QA.forward_asp_neg_prob, '\n',  ids_to_tokens(
               QA.forward_opi_query), '\n', QA.forward_opinion_prob, '\n',
           QA.forward_asp_query_mask, '\n', QA.forward_asp_query_seg, '\n',
@@ -157,7 +157,6 @@ def tokens_to_ids(QA_list):
 
 def list_to_object(dataset_object):
     line = []
-    sentence_representation = []
     forward_asp_query = []
     forward_asp_prob = []
     forward_asp_neg_prob = []
@@ -192,7 +191,6 @@ def list_to_object(dataset_object):
     sentiment_query_seg = []
     for QA in dataset_object:
         line.append(QA.line)
-        sentence_representation.append(QA.sentence_representation)
         forward_asp_query.append(QA.forward_asp_query)
         forward_asp_prob.append(QA.forward_asp_prob)
         forward_asp_neg_prob.append(QA.forward_asp_neg_prob)
@@ -227,7 +225,6 @@ def list_to_object(dataset_object):
         sentiment_query_seg.append(QA.sentiment_query_seg)
 
     return Data.QueryAndAnswer(line=line,
-                               sentence_representation=sentence_representation,
                                forward_asp_query=forward_asp_query,
                                forward_asp_prob=forward_asp_prob,
                                forward_asp_neg_prob=forward_asp_neg_prob,
@@ -522,8 +519,8 @@ def make_QA(line, word_list, aspect_list, opinion_list, sentiment_list):
     line_un_process = line_prop.split(" ")
     sentence_pos = nlp.pos_tag(line_prop)
     sentence_dependancy_parse = nlp.dependency_parse(line_prop)
-    sentence_representation = get_sentence_representation(
-        sentence_pos, sentence_dependancy_parse)
+    #sentence_representation = get_sentence_representation(
+    #    sentence_pos, sentence_dependancy_parse)
     #assert (len(word_list)) == len(sentence_pos)
     asp_prob_template = [0] * len(forward_aspect_query_template)
     asp_prop_sen = [0] * len(word_list)
@@ -744,7 +741,6 @@ def make_QA(line, word_list, aspect_list, opinion_list, sentiment_list):
     assert len(forward_opinion_prob) == len(forward_opi_query)
 
     return Data.QueryAndAnswer(line=line,
-                               sentence_representation=sentence_representation,
                                forward_asp_query=forward_asp_query,
                                forward_asp_prob=forward_asp_prob,
                                forward_asp_neg_prob=forward_asp_neg_prob,

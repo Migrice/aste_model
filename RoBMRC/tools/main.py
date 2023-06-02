@@ -205,12 +205,12 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
             opinion_query_seg = [0] * len(opinion_query)
             f_opi_length = len(opinion_query)
             
-            sentence_representation = batch_dict['sentence_representation'][0]
-            forward_opi_template = [0] * len(opinion_query)
-            forward_opi_prob = get_restrictive_forward_opinion(ok_start_tokens,
-                sentence_representation, aspects_list)
+            # sentence_representation = batch_dict['sentence_representation'][0]
+            # forward_opi_template = [0] * len(opinion_query)
+            # forward_opi_prob = get_restrictive_forward_opinion(ok_start_tokens,
+            #     sentence_representation, aspects_list)
             
-            forward_opinion_prob = forward_opi_template + forward_opi_prob
+            # forward_opinion_prob = forward_opi_template + forward_opi_prob
                     
             # opinions, indexes = get_restrictive_rel(
             #     ok_start_tokens, aspects_list)
@@ -240,9 +240,9 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
             f_opi_start_scores, f_opi_end_scores = model(
                 opinion_query, opinion_query_mask, opinion_query_seg, 'AO')
             
-            for i in range(len(f_opi_start_scores)):
-                    for j in range(len(f_opi_start_scores[0])):
-                        f_opi_start_scores[i][j][1] += forward_opinion_prob[j]
+            # for i in range(len(f_opi_start_scores)):
+            #         for j in range(len(f_opi_start_scores[0])):
+            #             f_opi_start_scores[i][j][1] += forward_opinion_prob[j]
             
             f_opi_start_scores = F.softmax(f_opi_start_scores[0], dim=1)
             f_opi_end_scores = F.softmax(f_opi_end_scores[0], dim=1)
@@ -343,8 +343,8 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
             b_asp_length = len(aspect_query)
             aspect_query = torch.tensor(aspect_query).long()
             
-            back_asp_prob = get_restrictive_backward_aspect(ok_start_tokens, sentence_representation,opinion_list)
-            backward_aspect_prob = aspect_query_seg + back_asp_prob
+            # back_asp_prob = get_restrictive_backward_aspect(ok_start_tokens, sentence_representation,opinion_list)
+            # backward_aspect_prob = aspect_query_seg + back_asp_prob
             
             if gpu:
                 aspect_query = aspect_query.cuda()
@@ -363,9 +363,9 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
             b_asp_start_scores, b_asp_end_scores = model(
                 aspect_query, aspect_query_mask, aspect_query_seg, 'OA')
             
-            for i in range(len(b_asp_start_scores)):
-                    for j in range(len(b_asp_start_scores[0])):
-                        b_asp_start_scores[i][j][1] += backward_aspect_prob[j]
+            # for i in range(len(b_asp_start_scores)):
+            #         for j in range(len(b_asp_start_scores[0])):
+            #             b_asp_start_scores[i][j][1] += backward_aspect_prob[j]
 
             b_asp_start_scores = F.softmax(b_asp_start_scores[0], dim=1)
             b_asp_end_scores = F.softmax(b_asp_end_scores[0], dim=1)
