@@ -8,11 +8,15 @@ import torch
 import argparse
 import math
 import os
+from stanfordcorenlp import StanfordCoreNLP
+import re
+import probability
+import all_dependancy
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 dataset_version = "v2/"
-dataset_name_list = ["15res", "14res", "14lap","16res"]
+dataset_name_list = ["15res"]
 dataset_type_list = ["train_triplets", "dev_triplets", "test_triplets"]
 if dataset_version.__eq__("v1/"):
     dataset_name_list = ["14rest", "14lap", "15rest", "16rest"]
@@ -20,6 +24,13 @@ if dataset_version.__eq__("v1/"):
 inference_beta = [0.90, 0.90, 0.90, 0.90]
 
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+
+nlp = StanfordCoreNLP('http://localhost', port=9000)
+
+positive_aspects_tag_prob, negative_aspects_tag_prob, positive_opinions_tag_prob, negative_opinions_tag_prob, aspects_tag_set, opinion_tag_set = probability.data_get_tags()
+
+aspect_roles_set, asp_roles_prob, opinions_roles_set, opinion_roles_prob = all_dependancy.data_get_roles()
+
 
 
 # def getStartAndEndWithPOS(good_tag_list, sentence_with_pos):
@@ -57,15 +68,45 @@ def get_restrictive_forward_opinion(ok_start_tokens,sentence_representation, asp
         if sentence_representation[i].get("mot") in aspects_list:
             if sentence_representation[i].get("forward_opinion_prob"):
                 cible_list.append(sentence_representation[i].get("cible"))
-    
     for i in range(len(sentence)):
         if sentence[i] in cible_list:
             for j in range(len(sentence_representation)):
                 if sentence[i] == sentence_representation[j].get("cible"):
-                    vector_prob_output[i] = sentence_representation[j].get(
-                        "forward_opinion_prob")
+                    if sentence_representation[j].get(
+                        "forward_opinion_prob") != None:  
+                        vector_prob_output[i] = sentence_representation[j].get(
+                        "forward_opinion_prob") 
     return vector_prob_output
 
+
+def preprocess(sen):
+    sente = " ".join(sen)
+    a = re.sub('\##', '', sente)
+    se = a.replace('.', 'se')
+    ses = se.replace('+', 'se')
+    return ses
+
+
+def get_sentence_representation(pos_tag, dependancy_parse):
+    sentenseTags = pos_tag
+    dependency = dependancy_parse
+    sentence_representation = []
+    for dependance in dependency:
+        word = {}
+        role = (dependance[0]).lower()
+        cible = dependance[1]-1
+        mot = dependance[2]-1
+        full_role = str(sentenseTags[mot][1]) + "-" + \
+            role + "-" + str(sentenseTags[cible][1])
+        word['mot'] = sentenseTags[mot][0]
+        word['cible'] = sentenseTags[cible][0]
+        word['full_role'] = full_role
+        if full_role in aspect_roles_set:
+            word['forward_opinion_prob'] = asp_roles_prob[full_role]
+        if full_role in opinions_roles_set:
+            word['backward_aspect_prob'] = opinion_roles_prob[full_role]
+        sentence_representation.append(word)
+    return sentence_representation
 
 def get_restrictive_backward_aspect(ok_start_tokens, sentence_representation, opinion_list):
     sentence = tokenizer.convert_ids_to_tokens(ok_start_tokens)
@@ -80,8 +121,10 @@ def get_restrictive_backward_aspect(ok_start_tokens, sentence_representation, op
         if sentence[i] in cible_list:
             for j in range(len(sentence_representation)):
                 if sentence[i] == sentence_representation[j].get("cible"):
-                    vector_prob_output[i] = sentence_representation[j].get(
-                        "backward_aspect_prob")
+                    if sentence_representation[j].get(
+                        "backward_aspect_prob") != None :
+                        vector_prob_output[i] = sentence_representation[j].get(
+                            "backward_aspect_prob")
     return vector_prob_output
 
 
@@ -205,12 +248,18 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
             opinion_query_seg = [0] * len(opinion_query)
             f_opi_length = len(opinion_query)
             
-            # sentence_representation = batch_dict['sentence_representation'][0]
-            # forward_opi_template = [0] * len(opinion_query)
-            # forward_opi_prob = get_restrictive_forward_opinion(ok_start_tokens,
-            #     sentence_representation, aspects_list)
+            #sentence_representation = batch_dict['sentence_representation'][0]
+            sen = tokenizer.convert_ids_to_tokens(ok_start_tokens)
+            line_prop = preprocess(sen)
+            sentence_pos = nlp.pos_tag(line_prop)
+            sentence_dependancy_parse = nlp.dependency_parse(line_prop)
+            sentence_representation = get_sentence_representation(sentence_pos, sentence_dependancy_parse)
+           
+            forward_opi_template = [0] * len(opinion_query)
+            forward_opi_prob = get_restrictive_forward_opinion(ok_start_tokens,
+                sentence_representation, aspects_list)
             
-            # forward_opinion_prob = forward_opi_template + forward_opi_prob
+            forward_opinion_prob = forward_opi_template + forward_opi_prob
                     
             # opinions, indexes = get_restrictive_rel(
             #     ok_start_tokens, aspects_list)
@@ -240,9 +289,9 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
             f_opi_start_scores, f_opi_end_scores = model(
                 opinion_query, opinion_query_mask, opinion_query_seg, 'AO')
             
-            # for i in range(len(f_opi_start_scores)):
-            #         for j in range(len(f_opi_start_scores[0])):
-            #             f_opi_start_scores[i][j][1] += forward_opinion_prob[j]
+            for i in range(len(f_opi_start_scores)):
+                    for j in range(len(f_opi_start_scores[0])):
+                        f_opi_start_scores[i][j][1] += forward_opinion_prob[j]
             
             f_opi_start_scores = F.softmax(f_opi_start_scores[0], dim=1)
             f_opi_end_scores = F.softmax(f_opi_end_scores[0], dim=1)
@@ -343,8 +392,8 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
             b_asp_length = len(aspect_query)
             aspect_query = torch.tensor(aspect_query).long()
             
-            # back_asp_prob = get_restrictive_backward_aspect(ok_start_tokens, sentence_representation,opinion_list)
-            # backward_aspect_prob = aspect_query_seg + back_asp_prob
+            back_asp_prob = get_restrictive_backward_aspect(ok_start_tokens, sentence_representation,opinion_list)
+            backward_aspect_prob = aspect_query_seg + back_asp_prob
             
             if gpu:
                 aspect_query = aspect_query.cuda()
@@ -363,9 +412,9 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
             b_asp_start_scores, b_asp_end_scores = model(
                 aspect_query, aspect_query_mask, aspect_query_seg, 'OA')
             
-            # for i in range(len(b_asp_start_scores)):
-            #         for j in range(len(b_asp_start_scores[0])):
-            #             b_asp_start_scores[i][j][1] += backward_aspect_prob[j]
+            for i in range(len(b_asp_start_scores)):
+                    for j in range(len(b_asp_start_scores[0])):
+                        b_asp_start_scores[i][j][1] += backward_aspect_prob[j]
 
             b_asp_start_scores = F.softmax(b_asp_start_scores[0], dim=1)
             b_asp_end_scores = F.softmax(b_asp_end_scores[0], dim=1)
@@ -683,7 +732,7 @@ def train(arguments):
                                                     gpu=arguments.gpu)
 
             for batch_index, batch_dict in enumerate(batch_generator):
-
+               
                 optimizer.zero_grad()
 
                 f_aspect_start_scores, f_aspect_end_scores = model(batch_dict['forward_asp_query'],
@@ -862,7 +911,7 @@ if __name__ == '__main__':
 
     # training hyper-parameter
     parser.add_argument('--gpu', type=bool, default=False)
-    parser.add_argument('--epoch_num', type=int, default=50)
+    parser.add_argument('--epoch_num', type=int, default=1)
     parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--learning_rate', type=float, default=1e-3)
     parser.add_argument('--tuning_bert_rate', type=float, default=1e-5)

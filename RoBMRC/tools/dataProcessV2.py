@@ -23,7 +23,8 @@ forward_opinion_query_template = [
 backward_opinion_query_template = ["[CLS]", "what", "opinions", "?", "[SEP]"]
 backward_aspect_query_template = [
     "[CLS]", "what", "aspect", "does", "the", "opinion", "describe", "?", "[SEP]"]
-sentiment_query_template = ["[CLS]", "what", "sentiment", "given", "the", "aspect", "and", "the", "opinion", "?", "[SEP]"]
+sentiment_query_template = ["[CLS]", "what", "sentiment",
+                            "given", "the", "aspect", "and", "the", "opinion", "?", "[SEP]"]
 
 # BertTokenizer
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
@@ -92,7 +93,7 @@ def print_QA(QA: Data.QueryAndAnswer):
 
 
 def valid(QA: Data.QueryAndAnswer):
-    
+
     assert len(QA.forward_asp_query) == len(QA.forward_asp_answer_start) \
         == len(QA.forward_asp_answer_end) == len(QA.forward_asp_query_mask) \
         == len(QA.forward_asp_query_seg) == len(QA.forward_asp_prob) == len(QA.forward_asp_neg_prob) == len(QA.forward_aspect_prob)
@@ -346,7 +347,7 @@ def dataset_align(dataset_object, max_tokens_len, max_aspect_num):
                     -1, tokenized_QA.forward_opi_query_mask[0])
                 tokenized_QA.forward_opi_query_seg.insert(
                     -1, tokenized_QA.forward_opi_query_seg[0])
-                
+
                 tokenized_QA.forward_opinion_prob.insert(
                     -1, tokenized_QA.forward_opinion_prob[0])
 
@@ -361,7 +362,7 @@ def dataset_align(dataset_object, max_tokens_len, max_aspect_num):
                     -1, tokenized_QA.backward_asp_query_mask[0])
                 tokenized_QA.backward_asp_query_seg.insert(
                     -1, tokenized_QA.backward_asp_query_seg[0])
-                
+
                 tokenized_QA.backward_aspect_prob.insert(
                     -1, tokenized_QA.backward_aspect_prob[0])
 
@@ -444,7 +445,7 @@ def preprocess(sen):
 #                 index_list.append(i)
 #     return index_list
 
-#TO DO ponctuation 
+#TO DO ponctuation
 def get_restrictive_rel(ok_start_token, aspect_list, role_set, roles_prob):
     sent = ' '.join(ok_start_token)
     #sena = sent[:-1]
@@ -454,7 +455,7 @@ def get_restrictive_rel(ok_start_token, aspect_list, role_set, roles_prob):
     #print(new_sen)
     sentenseTags = nlp.pos_tag(sena)
     #print(sentenseTags)
-  
+
     dependency = nlp.dependency_parse(sena)
     #print("dep", dependency)
     opinions = []
@@ -471,7 +472,7 @@ def get_restrictive_rel(ok_start_token, aspect_list, role_set, roles_prob):
         word['mot'] = sentenseTags[mot][0]
         word['cible'] = sentenseTags[cible][0]
         word['role'] = full_role
-        
+
         for i in range(len(aspect_list)):
             if ((sentenseTags[mot][0] == aspect_list[i])):
                 if full_role in role_set:
@@ -480,7 +481,8 @@ def get_restrictive_rel(ok_start_token, aspect_list, role_set, roles_prob):
                     word_cible["mot"] = sentenseTags[mot][0]
                     word_cible["cible"] = sentenseTags[cible][0]
                     word_cible["prob"] = roles_prob[full_role]
-                    word_cible["indice"] = new_sen.index(sentenseTags[cible][0])
+                    word_cible["indice"] = new_sen.index(
+                        sentenseTags[cible][0])
                     word_and_prob.append(word_cible)
                     #print(word_cible)
             rep.append(word)
@@ -489,6 +491,7 @@ def get_restrictive_rel(ok_start_token, aspect_list, role_set, roles_prob):
             if new_sen[i] in opinions:
                 index_list.append(i)
     return word_and_prob, index_list
+
 
 def get_sentence_representation(pos_tag, dependancy_parse):
     sentenseTags = pos_tag
@@ -520,14 +523,14 @@ def make_QA(line, word_list, aspect_list, opinion_list, sentiment_list):
     sentence_pos = nlp.pos_tag(line_prop)
     sentence_dependancy_parse = nlp.dependency_parse(line_prop)
     #sentence_representation = get_sentence_representation(
-    #    sentence_pos, sentence_dependancy_parse)
+    #  sentence_pos, sentence_dependancy_parse)
     #assert (len(word_list)) == len(sentence_pos)
     asp_prob_template = [0] * len(forward_aspect_query_template)
     asp_prop_sen = [0] * len(word_list)
 
     neg_asp_template = [0] * len(forward_aspect_query_template)
     neg_asp_prop_sen = [0] * len(word_list)
-    
+
     # Probabilités des aspects en fonction du POS-tagging
     for i in range(0, len(sentence_pos)-1):
         if sentence_pos[i][1] in aspects_tag_set:
@@ -535,7 +538,7 @@ def make_QA(line, word_list, aspect_list, opinion_list, sentiment_list):
             neg_asp_prop_sen[i] = negative_aspects_tag_prob[sentence_pos[i][1]]
     forward_asp_prob = asp_prob_template + asp_prop_sen
     forward_asp_neg_prob = neg_asp_template + neg_asp_prop_sen
-    
+
     #Probabilités des aspects en fonction des relations grammaticales
     aspect_prob_sen = [0] * len(word_list)
     for dependance in sentence_dependancy_parse:
@@ -545,13 +548,13 @@ def make_QA(line, word_list, aspect_list, opinion_list, sentiment_list):
         mot = dependance[2]-1
         full_role = str(sentence_pos[mot][1]) + "-" + \
             role + "-" + str(sentence_pos[cible][1])
-        if full_role in aspect_roles_set :
+        if full_role in aspect_roles_set:
             word["mot"] = sentence_pos[mot][0]
             word["prob"] = asp_roles_prob[full_role]
             for i in range(len(line_un_process)):
                 if word["mot"] == line_un_process[i]:
-                    aspect_prob_sen[i] = asp_roles_prob[full_role]    
-   
+                    aspect_prob_sen[i] = asp_roles_prob[full_role]
+
     forward_aspect_prob = asp_prob_template + aspect_prob_sen
 
     forward_asp_query_mask = [1] * len(forward_asp_query)
@@ -589,7 +592,7 @@ def make_QA(line, word_list, aspect_list, opinion_list, sentiment_list):
     backward_opi_neg_prob = neg_opi_pos_prob_template + neg_opi_pos_prob_sen
 
     opinion_prob_sen = [0] * len(word_list)
-    
+
     # Probabilités des opinions en fonction des relations grammaticales
     for dependance in sentence_dependancy_parse:
         word = {}
@@ -603,7 +606,7 @@ def make_QA(line, word_list, aspect_list, opinion_list, sentiment_list):
             for i in range(len(line_un_process)):
                 if word["mot"] == line_un_process[i]:
                     opinion_prob_sen[i] = opinion_roles_prob[full_role]
-    
+
     backward_opinion_prob = opi_pos_prob_template + opinion_prob_sen
 
     backward_opi_query_mask = [1] * len(backward_opi_query)
@@ -637,7 +640,7 @@ def make_QA(line, word_list, aspect_list, opinion_list, sentiment_list):
     for i in range(len(aspect_list)):
         asp = aspect_list[i]
         opi = opinion_list[i]
-        
+
         aspect = word_list[asp[0]:asp[1] + 1]
 
         opi_template = [0] * len(forward_opinion_query_template[0:6] + word_list[asp[0]:asp[1] + 1] +
@@ -649,7 +652,8 @@ def make_QA(line, word_list, aspect_list, opinion_list, sentiment_list):
         #print("forward_opi",opin_list)
         if (opin_list):
             for i in range(len(opin_list)):
-                opi_sentence[opin_list[i].get("indice")] = opin_list[i].get("prob")
+                opi_sentence[opin_list[i].get(
+                    "indice")] = opin_list[i].get("prob")
         opi_vector = opi_template + opi_sentence
         #print("for_prob",opi_sentence)
         forward_opinion_prob.append(opi_vector)
@@ -659,7 +663,7 @@ def make_QA(line, word_list, aspect_list, opinion_list, sentiment_list):
         forward_asp_answer_end[len(forward_aspect_query_template) + asp[1]] = 1
 
         opi_query_temp = forward_opinion_query_template[0:6] + word_list[asp[0]:asp[1] + 1] + \
-            forward_opinion_query_template[6:] + word_list        
+            forward_opinion_query_template[6:] + word_list
         forward_opi_query.append(opi_query_temp)
 
         opi_query_mask_temp = [1] * len(opi_query_temp)
@@ -682,21 +686,23 @@ def make_QA(line, word_list, aspect_list, opinion_list, sentiment_list):
             backward_opinion_query_template) + opi[0]] = 1
         backward_opi_answer_end[len(
             backward_opinion_query_template) + opi[1]] = 1
-        
+
         opinion = word_list[opi[0]:opi[1] + 1]
 
         asp_template = [0] * len(backward_aspect_query_template[0:6] + word_list[opi[0]:opi[1] + 1] +
                                  backward_aspect_query_template[6:])
         asp_sentence = [0] * len(word_list)
 
-        asp_list, aspect_indexes = get_restrictive_rel(word_list, opinion, opinions_roles_set, opinion_roles_prob)
+        asp_list, aspect_indexes = get_restrictive_rel(
+            word_list, opinion, opinions_roles_set, opinion_roles_prob)
         #print("backward_aspect", asp_list)
         if asp_list:
             for i in range(len(asp_list)):
-                asp_sentence[asp_list[i].get("indice")] = asp_list[i].get("prob")
+                asp_sentence[asp_list[i].get(
+                    "indice")] = asp_list[i].get("prob")
         #print("prob_vector",asp_sentence )
         asp_vector = asp_template + asp_sentence
-        
+
         backward_aspect_prob.append(asp_vector)
 
         asp_query_temp = backward_aspect_query_template[0:6] + word_list[opi[0]:opi[1] + 1] + \
