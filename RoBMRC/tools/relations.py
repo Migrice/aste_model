@@ -5,7 +5,7 @@ import re
 nlp = StanfordCoreNLP('http://localhost', port=9000)
 
 data_path = "./data/original/v2/"
-dataset_name_list = ["14lap"]
+dataset_name_list = ["16res"]
 dataset_type_list = ["train_triplets", "dev_triplets"]
 
 aspect_opinion_rel = ["JJ-amod-NN",
