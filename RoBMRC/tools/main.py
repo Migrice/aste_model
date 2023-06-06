@@ -13,7 +13,7 @@ import re
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 dataset_version = "v2/"
-dataset_name_list = ["15res"]
+dataset_name_list = ["14lap"]
 dataset_type_list = ["train_triplets", "dev_triplets", "test_triplets"]
 if dataset_version.__eq__("v1/"):
     dataset_name_list = ["14rest", "14lap", "15rest", "16rest"]

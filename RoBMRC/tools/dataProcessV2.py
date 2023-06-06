@@ -10,7 +10,7 @@ import all_dependancy
 nlp = StanfordCoreNLP('http://localhost', port=9000)
 
 data_path = "./data/original/v2/"
-dataset_name_list = ["15res"]
+dataset_name_list = ["14lap"]
 dataset_type_list = ["train_triplets", "dev_triplets", "test_triplets"]
 
 triplet_pattern = re.compile(r'[(](.*?)[)]', re.S)
