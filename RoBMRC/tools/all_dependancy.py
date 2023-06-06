@@ -31,22 +31,22 @@ def get_line_relations(line):
         0] for triplet in triplet_str_list]
     aspect_list = [get_list(aspect.split(','))
                    for aspect in aspect_list]
-    
+
     opinion_list = [re.findall(aspect_and_opinion_pattern, triplet)[
         1] for triplet in triplet_str_list]
     opinion_list = [get_list(opinion.split(','))
                     for opinion in opinion_list]
-    
+
     my_list = []
     for i in range(len(aspect_list)):
         for j in range(len(aspect_list[i])):
             my_list.append(sen_to_list[aspect_list[i][j]])
-    
+
     my_opi_list = []
     for i in range(len(opinion_list)):
         for j in range(len(opinion_list[i])):
             my_opi_list.append(sen_to_list[opinion_list[i][j]])
-    
+
     sentenseTags = nlp.pos_tag(sentence)
     dependency = nlp.dependency_parse(sentence)
     all_roles = []
@@ -62,7 +62,7 @@ def get_line_relations(line):
         word['full_role'] = full_role
         sentence_represententation.append(word)
         all_roles.append(full_role)
-    
+
     aspect_and_roles = []
     opinion_and_roles = []
     good_rel = []
@@ -86,7 +86,7 @@ def get_line_relations(line):
             opinion_and_roles.append(opi_tag)
             if i.get("cible") in my_list:
                 good_opinion_rel.append(i.get("full_role"))
-                
+
     obj = {}
     obj["line"] = line
     obj["aspect"] = aspect_and_roles
@@ -101,7 +101,8 @@ def train_data_get_rel(text):
     all_roles = []
     good_opinion_roles = []
     for line in text:
-        line_rep, goo_rel, init_roles, all_rol, good_opi_rol = get_line_relations(line)
+        line_rep, goo_rel, init_roles, all_rol, good_opi_rol = get_line_relations(
+            line)
         data_repr.append(line_rep)
         good_relations = good_relations + goo_rel
         initial_asp_roles = initial_asp_roles + init_roles
@@ -113,9 +114,9 @@ def train_data_get_rel(text):
 def data_get_roles():
 
     for dataset_name in dataset_name_list:
-        total_good_roles = [] # bon couple aspect-opinion
-        total_all_roles = []# toutes les relations existantes
-        total_good_opinion_roles = [] #bon couple opinion-aspect
+        total_good_roles = []  # bon couple aspect-opinion
+        total_all_roles = []  # toutes les relations existantes
+        total_good_opinion_roles = []  # bon couple opinion-aspect
         for dataset_type in dataset_type_list:
             file = open(data_path + dataset_name + "/" +
                         dataset_type + ".txt", "r", encoding="utf-8")
@@ -127,7 +128,6 @@ def data_get_roles():
             total_good_roles = total_good_roles + good_aspects_roles
             total_all_roles = total_all_roles + all_roles
             total_good_opinion_roles = total_good_opinion_roles + good_opi_rol
-            
 
         aspects_tag_set = set(total_good_roles)
         aspects_tag = {}
@@ -138,7 +138,6 @@ def data_get_roles():
         all_role = {}
         for i in all_role_set:
             all_role[i] = total_all_roles.count(i)
-
 
         aspect_roles_prob = {}
         for key, value in aspects_tag.items():
@@ -154,4 +153,3 @@ def data_get_roles():
             opinion_rolesprob[key] = opinions_tag[key] / all_role[key]
 
         return aspects_tag_set, aspect_roles_prob, opinion_tag_set, opinion_rolesprob
-
