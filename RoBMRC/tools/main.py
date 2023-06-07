@@ -9,6 +9,9 @@ import argparse
 import math
 import os
 import re
+import probability
+from stanfordcorenlp import StanfordCoreNLP
+import all_dependancy
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
@@ -22,6 +25,58 @@ inference_beta = [0.90, 0.90, 0.90, 0.90]
 
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
+nlp = StanfordCoreNLP('http://localhost', port=9000)
+
+positive_aspects_tag_prob, negative_aspects_tag_prob, positive_opinions_tag_prob, negative_opinions_tag_prob, aspects_tag_set, opinion_tag_set = probability.data_get_tags()
+
+aspect_roles_set, asp_roles_prob, opinions_roles_set, opinion_roles_prob = all_dependancy.data_get_roles()
+
+
+def preprocess(sen):
+    sente = " ".join(sen)
+    a = re.sub('\##', '', sente)
+    se = a.replace('.', 'se')
+    ses = se.replace('+', 'se')
+    return ses
+
+def get_restrictive_forward_opi(ok_start_tokens, sentence_pos, sentence_dependancy_parse):
+    opi_sentence = [0] * len(ok_start_tokens)
+    sentence = tokenizer.convert_ids_to_tokens(ok_start_tokens)
+    for dependance in sentence_dependancy_parse:
+            word = {}
+            role = (dependance[0]).lower()
+            cible = dependance[1]-1
+            mot = dependance[2]-1
+            full_role = str(sentence_pos[mot][1]) + "-" + \
+                role + "-" + str(sentence_pos[cible][1])
+            if full_role in opinions_roles_set:
+                word["mot"] = sentence_pos[mot][0]
+                for i in range(len(ok_start_tokens)):
+                    if word["mot"] == sentence[i]:
+                        opi_sentence[i] = opinion_roles_prob[full_role]
+                        
+    return opi_sentence
+        
+
+def get_restrictive_backward_asp(ok_start_tokens, sentence_pos, sentence_dependancy_parse):
+            #Probabilités des aspects en fonction des relations grammaticales
+    asp_sentence = [0] * len(ok_start_tokens)
+    sentence = tokenizer.convert_ids_to_tokens(ok_start_tokens)
+
+    for dependance in sentence_dependancy_parse:
+        word = {}
+        role = (dependance[0]).lower()
+        cible = dependance[1]-1
+        mot = dependance[2]-1
+        full_role = str(sentence_pos[mot][1]) + "-" + \
+            role + "-" + str(sentence_pos[cible][1])
+        if full_role in aspect_roles_set:
+            word["mot"] = sentence_pos[mot][0]
+            word["prob"] = asp_roles_prob[full_role]
+            for i in range(len(ok_start_tokens)):
+                if word["mot"] == sentence[i]:
+                    asp_sentence[i] = asp_roles_prob[full_role]
+    return asp_sentence
 
 def preprocess(sen):
     sente = " ".join(sen)
@@ -87,7 +142,12 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
         ok_start_tokens = batch_dict['forward_asp_query'][0][ok_start_index].squeeze(
             1)  # sequence de mots correspondante aux positions extraites . Squeeze supprime la dimension de 1 du tenseur, qui ne contient qu'un seul élément
         #print(aspects_tags_prob)
-
+        
+        untokenized = tokenizer.convert_ids_to_tokens(ok_start_tokens[0])
+        preprocessed_sen = preprocess(untokenized)
+        sentence_pos = nlp.pos_tag(preprocessed_sen)
+        sentence_dependancy_parse = nlp.dependency_parse(preprocessed_sen)
+        
         f_asp_start_scores, f_asp_end_scores = model(batch_dict['forward_asp_query'],
                                                      batch_dict['forward_asp_query_mask'],            batch_dict['forward_asp_query_seg'], 'A')
         
@@ -146,8 +206,10 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
             opinion_query.append(tokenizer.convert_tokens_to_ids('[SEP]'))
             opinion_query_seg = [0] * len(opinion_query)
             f_opi_length = len(opinion_query)
-
             
+            opinion_prob = get_restrictive_forward_opi(ok_start_tokens, sentence_pos, sentence_dependancy_parse)
+            forward_opi_prob = opinion_query_seg + opinion_prob
+        
             opinion_query = torch.tensor(opinion_query).long()
             #print("opinion_query_tensor", opinion_query)
             if gpu:
@@ -169,6 +231,10 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
 
             f_opi_start_scores, f_opi_end_scores = model(
                 opinion_query, opinion_query_mask, opinion_query_seg, 'AO')
+            
+            for i in range(len(f_opi_start_scores)):
+                for j in range(len(f_opi_start_scores[0])):
+                    f_opi_start_scores[i][j][1] += forward_opi_prob[j]
 
             f_opi_start_scores = F.softmax(f_opi_start_scores[0], dim=1)
             f_opi_end_scores = F.softmax(f_opi_end_scores[0], dim=1)
@@ -267,6 +333,10 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
             aspect_query_seg = [0] * len(aspect_query)
             b_asp_length = len(aspect_query)
             aspect_query = torch.tensor(aspect_query).long()
+            
+            backward_asp = get_restrictive_backward_asp(ok_start_tokens, sentence_pos, sentence_dependancy_parse)
+            
+            backward_asp_prob = aspect_query_seg + backward_asp
 
             if gpu:
                 aspect_query = aspect_query.cuda()
@@ -284,6 +354,10 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
 
             b_asp_start_scores, b_asp_end_scores = model(
                 aspect_query, aspect_query_mask, aspect_query_seg, 'OA')
+            
+            for i in range(len(b_asp_start_scores)):
+                for j in range(len(b_asp_start_scores[0])):
+                    b_asp_start_scores[i][j][1] = backward_asp_prob[j]
 
 
             b_asp_start_scores = F.softmax(b_asp_start_scores[0], dim=1)
