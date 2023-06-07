@@ -13,7 +13,7 @@ import re
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 dataset_version = "v2/"
-dataset_name_list = ["14lap"]
+dataset_name_list = ["15res"]
 dataset_type_list = ["train_triplets", "dev_triplets", "test_triplets"]
 if dataset_version.__eq__("v1/"):
     dataset_name_list = ["14rest", "14lap", "15rest", "16rest"]
@@ -23,101 +23,12 @@ inference_beta = [0.90, 0.90, 0.90, 0.90]
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
 
-# def getStartAndEndWithPOS(good_tag_list, sentence_with_pos):
-#     target_list = []
-#     target_list_index = []
-
-#     for i in range(len(sentence_with_pos)):
-#         if (sentence_with_pos[i][1] in target_list):
-#             target_list.append(sentence_with_pos[i][0])
-#             target_list_index.append(i)
-#     #print("target_list", target_list)
-#     #print("index", target_list_index)
-
-#     start_index = []
-#     end_index = []
-
-#     for i in range (0, len(target_list_index)-1):
-#         if target_list_index[i] == (target_list_index[i+1]-1):
-#             start_index.append(target_list_index[i])
-#         if target_list_index[i] == opinion_list_index[i-1] +1:
-#             end_index.append(target_list_index[i])
-#     for i in range(len(target_list_index)):
-#         if target_list_index[i] not in start_index:
-#             if target_list_index[i] not in end_index:
-#                 start_index.append(target_list_index[i])
-#                 end_index.append(target_list_index[i])
-#     return start_index, end_index
-
-
-def get_restrictive_forward_opinion(ok_start_tokens,sentence_representation, aspects_list):
-    sentence = tokenizer.convert_ids_to_tokens(ok_start_tokens)
-    cible_list = []
-    vector_prob_output = [0] * len(ok_start_tokens)
-    for i in range(len(sentence_representation)):
-        if sentence_representation[i].get("mot") in aspects_list:
-            if sentence_representation[i].get("forward_opinion_prob"):
-                cible_list.append(sentence_representation[i].get("cible"))
-    for i in range(len(sentence)):
-        if sentence[i] in cible_list:
-            for j in range(len(sentence_representation)):
-                if sentence[i] == sentence_representation[j].get("cible"):
-                    if sentence_representation[j].get(
-                        "forward_opinion_prob") != None:  
-                        vector_prob_output[i] = sentence_representation[j].get(
-                        "forward_opinion_prob") 
-    return vector_prob_output
-
-
 def preprocess(sen):
     sente = " ".join(sen)
     a = re.sub('\##', '', sente)
     se = a.replace('.', 'se')
     ses = se.replace('+', 'se')
     return ses
-
-
-# def get_sentence_representation(pos_tag, dependancy_parse):
-#     sentenseTags = pos_tag
-#     dependency = dependancy_parse
-#     sentence_representation = []
-#     for dependance in dependency:
-#         word = {}
-#         role = (dependance[0]).lower()
-#         cible = dependance[1]-1
-#         mot = dependance[2]-1
-#         full_role = str(sentenseTags[mot][1]) + "-" + \
-#             role + "-" + str(sentenseTags[cible][1])
-#         word['mot'] = sentenseTags[mot][0]
-#         word['cible'] = sentenseTags[cible][0]
-#         word['full_role'] = full_role
-#         if full_role in aspect_roles_set:
-#             word['forward_opinion_prob'] = asp_roles_prob[full_role]
-#         if full_role in opinions_roles_set:
-#             word['backward_aspect_prob'] = opinion_roles_prob[full_role]
-#         sentence_representation.append(word)
-#     return sentence_representation
-
-def get_restrictive_backward_aspect(ok_start_tokens, sentence_representation, opinion_list):
-    sentence = tokenizer.convert_ids_to_tokens(ok_start_tokens)
-    cible_list = []
-    vector_prob_output = [0] * len(ok_start_tokens)
-    for i in range(len(sentence_representation)):
-        if sentence_representation[i].get("mot") in opinion_list:
-            if sentence_representation[i].get("backward_aspect_prob"):
-                cible_list.append(sentence_representation[i].get("cible"))
-
-    for i in range(len(sentence)):
-        if sentence[i] in cible_list:
-            for j in range(len(sentence_representation)):
-                if sentence[i] == sentence_representation[j].get("cible"):
-                    if sentence_representation[j].get(
-                        "backward_aspect_prob") != None :
-                        vector_prob_output[i] = sentence_representation[j].get(
-                            "backward_aspect_prob")
-    return vector_prob_output
-
-
 
 def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_len):
     model.eval()
@@ -178,13 +89,11 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
         #print(aspects_tags_prob)
 
         f_asp_start_scores, f_asp_end_scores = model(batch_dict['forward_asp_query'],
-                                                     batch_dict['forward_asp_query_mask'],
-                                                     batch_dict['forward_asp_query_seg'], 'A')
+                                                     batch_dict['forward_asp_query_mask'],            batch_dict['forward_asp_query_seg'], 'A')
+        
         for i in range(len(f_asp_start_scores)):
             for j in range(len(f_asp_start_scores[0])):
-                f_asp_start_scores[i][j][1] += (batch_dict['forward_asp_prob'][i][j] +
-                                                   batch_dict['forward_aspect_prob'][i][j])
-                f_asp_start_scores[i][j][0] += batch_dict['forward_asp_neg_prob'][i][j]
+                f_asp_start_scores[i][j][1] += (batch_dict['forward_asp_prob'][i][j])
 
         f_asp_start_scores = F.softmax(f_asp_start_scores[0], dim=1)
         f_asp_end_scores = F.softmax(f_asp_end_scores[0], dim=1)
@@ -237,26 +146,8 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
             opinion_query.append(tokenizer.convert_tokens_to_ids('[SEP]'))
             opinion_query_seg = [0] * len(opinion_query)
             f_opi_length = len(opinion_query)
-            
-            #sentence_representation = batch_dict['sentence_representation'][0]
-            sen = tokenizer.convert_ids_to_tokens(ok_start_tokens)
-            line_prop = preprocess(sen)
-            # sentence_pos = nlp.pos_tag(line_prop)
-            # sentence_dependancy_parse = nlp.dependency_parse(line_prop)
-            # sentence_representation = get_sentence_representation(sentence_pos, sentence_dependancy_parse)
-           
-            # forward_opi_template = [0] * len(opinion_query)
-            # forward_opi_prob = get_restrictive_forward_opinion(ok_start_tokens,
-            #     sentence_representation, aspects_list)
-            
-            # forward_opinion_prob = forward_opi_template + forward_opi_prob
-                    
-            # opinions, indexes = get_restrictive_rel(
-            #     ok_start_tokens, aspects_list)
 
-            # for i in range(len(indexes)):
-            #     indexes[i] += len(opinion_query)
-
+            
             opinion_query = torch.tensor(opinion_query).long()
             #print("opinion_query_tensor", opinion_query)
             if gpu:
@@ -278,11 +169,7 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
 
             f_opi_start_scores, f_opi_end_scores = model(
                 opinion_query, opinion_query_mask, opinion_query_seg, 'AO')
-            
-            # for i in range(len(f_opi_start_scores)):
-            #         for j in range(len(f_opi_start_scores[0])):
-            #             f_opi_start_scores[i][j][1] += forward_opinion_prob[j]
-            
+
             f_opi_start_scores = F.softmax(f_opi_start_scores[0], dim=1)
             f_opi_end_scores = F.softmax(f_opi_end_scores[0], dim=1)
             f_opi_start_prob, f_opi_start_ind = torch.max(
@@ -335,11 +222,10 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
         #     for i in range(len(b_opi_start_scores)):
         #         for j in opinion_tag_positions:
         #             b_opi_start_scores[i][j][1] += 0.9
-                    
+
         for i in range(len(b_opi_start_scores)):
-                    for j in range(len(b_opi_start_scores[0])):
-                        b_opi_start_scores[i][j][1] += (batch_dict['backward_opi_prob'][i][j] + batch_dict['backward_opinion_prob'][i][j])
-                        b_opi_start_scores[i][j][0] += batch_dict['backward_opi_neg_prob'][i][j]
+            for j in range(len(b_opi_start_scores[0])):
+                b_opi_start_scores[i][j][1] += batch_dict['backward_opi_prob'][i][j] 
 
         b_opi_start_scores = F.softmax(b_opi_start_scores[0], dim=1)
         b_opi_end_scores = F.softmax(b_opi_end_scores[0], dim=1)
@@ -381,10 +267,7 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
             aspect_query_seg = [0] * len(aspect_query)
             b_asp_length = len(aspect_query)
             aspect_query = torch.tensor(aspect_query).long()
-            
-            # back_asp_prob = get_restrictive_backward_aspect(ok_start_tokens, sentence_representation,opinion_list)
-            # backward_aspect_prob = aspect_query_seg + back_asp_prob
-            
+
             if gpu:
                 aspect_query = aspect_query.cuda()
             aspect_query = torch.cat(
@@ -401,10 +284,7 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
 
             b_asp_start_scores, b_asp_end_scores = model(
                 aspect_query, aspect_query_mask, aspect_query_seg, 'OA')
-            
-            # for i in range(len(b_asp_start_scores)):
-            #         for j in range(len(b_asp_start_scores[0])):
-            #             b_asp_start_scores[i][j][1] += backward_aspect_prob[j]
+
 
             b_asp_start_scores = F.softmax(b_asp_start_scores[0], dim=1)
             b_asp_end_scores = F.softmax(b_asp_end_scores[0], dim=1)
@@ -722,7 +602,7 @@ def train(arguments):
                                                     gpu=arguments.gpu)
 
             for batch_index, batch_dict in enumerate(batch_generator):
-               
+
                 optimizer.zero_grad()
 
                 f_aspect_start_scores, f_aspect_end_scores = model(batch_dict['forward_asp_query'],
@@ -730,9 +610,8 @@ def train(arguments):
                                                                    batch_dict['forward_asp_query_seg'], 'A')
                 for i in range(len(f_aspect_start_scores)):
                     for j in range(len(f_aspect_start_scores[0])):
-                        f_aspect_start_scores[i][j][1] += ( batch_dict['forward_asp_prob'][i][j] + \
-                            batch_dict['forward_aspect_prob'][i][j])
-                        f_aspect_start_scores[i][j][0] += batch_dict['forward_asp_neg_prob'][i][j]
+                        f_aspect_start_scores[i][j][1] += (batch_dict['forward_asp_prob'][i][j])
+  
 
                 f_asp_loss = utils.calculate_entity_loss(f_aspect_start_scores, f_aspect_end_scores,
                                                          batch_dict['forward_asp_answer_start'],
@@ -744,9 +623,7 @@ def train(arguments):
 
                 for i in range(len(b_opi_start_scores)):
                     for j in range(len(b_opi_start_scores[0])):
-                        b_opi_start_scores[i][j][1] += (
-                            batch_dict['backward_opi_prob'][i][j] + batch_dict['backward_opinion_prob'][i][j])
-                        b_opi_start_scores[i][j][0] += batch_dict['backward_opi_neg_prob'][i][j]
+                        b_opi_start_scores[i][j][1] += batch_dict['backward_opi_prob'][i][j]
 
                 b_opi_loss = utils.calculate_entity_loss(b_opi_start_scores, b_opi_end_scores,
                                                          batch_dict['backward_opi_answer_start'],
@@ -758,8 +635,8 @@ def train(arguments):
                     .view(-1, batch_dict['forward_opi_query_mask'].size(-1))
                 batch_dict['forward_opi_query_seg'] = batch_dict['forward_opi_query_seg'] \
                     .view(-1, batch_dict['forward_opi_query_seg'].size(-1))
-                batch_dict['forward_opinion_prob'] = batch_dict['forward_opinion_prob'] \
-                    .view(-1, batch_dict['forward_opinion_prob'].size(-1))
+                batch_dict['forward_opi_prob'] = batch_dict['forward_opi_prob'] \
+                    .view(-1, batch_dict['forward_opi_prob'].size(-1))
 
                 f_opi_start_scores, f_opi_end_scores = model(
                     batch_dict['forward_opi_query'],
@@ -767,9 +644,9 @@ def train(arguments):
                     batch_dict['forward_opi_query_seg'],
                     'AO')
 
-                # for i in range(len(f_opi_start_scores)):
-                #     for j in range(len(f_opi_start_scores[0])):
-                #         f_opi_start_scores[i][j][1] += batch_dict['forward_opinion_prob'][i][j]
+                for i in range(len(f_opi_start_scores)):
+                    for j in range(len(f_opi_start_scores[0])):
+                        f_opi_start_scores[i][j][1] += batch_dict['forward_opi_prob'][i][j]
 
                 f_opi_loss = utils.calculate_entity_loss(f_opi_start_scores, f_opi_end_scores,
                                                          batch_dict['forward_opi_answer_start'].view(-1, batch_dict[
@@ -785,17 +662,17 @@ def train(arguments):
                     .view(-1, batch_dict['backward_asp_query_mask'].size(-1))
                 batch_dict['backward_asp_query_seg'] = batch_dict['backward_asp_query_seg'] \
                     .view(-1, batch_dict['backward_asp_query_seg'].size(-1))
-                batch_dict['backward_aspect_prob'] = batch_dict['backward_aspect_prob'] \
-                    .view(-1, batch_dict['backward_aspect_prob'].size(-1))
+                batch_dict['backward_asp_prob'] = batch_dict['backward_asp_prob'] \
+                    .view(-1, batch_dict['backward_asp_prob'].size(-1))
 
                 b_asp_start_scores, b_asp_end_scores = model(
                     batch_dict['backward_asp_query'],
                     batch_dict['backward_asp_query_mask'],
                     batch_dict['backward_asp_query_seg'],
                     'OA')
-                # for i in range(len(b_asp_start_scores)):
-                #     for j in range(len(b_asp_start_scores[0])):
-                #         b_asp_start_scores[i][j][1] += batch_dict['backward_aspect_prob'][i][j]
+                for i in range(len(b_asp_start_scores)):
+                    for j in range(len(b_asp_start_scores[0])):
+                        b_asp_start_scores[i][j][1] += batch_dict['backward_asp_prob'][i][j]
 
                 b_asp_loss = utils.calculate_entity_loss(
                     b_asp_start_scores, b_asp_end_scores,
