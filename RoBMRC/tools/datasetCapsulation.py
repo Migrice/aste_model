@@ -1,7 +1,6 @@
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 
-
 class QueryAndAnswer:
     def __init__(self, line, sentence_representation, forward_asp_query, forward_asp_prob, forward_asp_neg_prob, 
 forward_aspect_prob,
