@@ -8,7 +8,15 @@ import torch
 import argparse
 import math
 import os
+import all_dependancy
 from stanfordcorenlp import StanfordCoreNLP
+import re
+
+
+
+aspect_roles_set, asp_roles_prob, opinions_roles_set, opinion_roles_prob = all_dependancy.data_get_roles()
+
+nlp = StanfordCoreNLP('http://localhost', port=9000)
 
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
@@ -22,6 +30,38 @@ if dataset_version.__eq__("v1/"):
 inference_beta = [0.90, 0.90, 0.90, 0.90]
 
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+
+
+def preprocess(sen):
+    sente = " ".join(sen)
+    a = re.sub('\##', '', sente)
+    se = a.replace('.', 'se')
+    ses = se.replace('+', 'se')
+    return ses
+
+
+def get_sentence_representation(pos_tag, dependancy_parse):
+    sentenseTags = pos_tag
+    dependency = dependancy_parse
+    sentence_representation = []
+    for dependance in dependency:
+        word = {}
+        role = (dependance[0]).lower()
+        cible = dependance[1]-1
+        mot = dependance[2]-1
+        full_role = str(sentenseTags[mot][1]) + "-" + \
+            role + "-" + str(sentenseTags[cible][1])
+        word['mot'] = sentenseTags[mot][0]
+        word['cible'] = sentenseTags[cible][0]
+        word['full_role'] = full_role
+        if full_role in aspect_roles_set:
+            word['forward_opinion_prob'] = asp_roles_prob[full_role]
+        if full_role in opinions_roles_set:
+            word['backward_aspect_prob'] = opinion_roles_prob[full_role]
+        sentence_representation.append(word)
+    return sentence_representation
+
+
 
 
 # def getStartAndEndWithPOS(good_tag_list, sentence_with_pos):
@@ -167,6 +207,10 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
         #print("f_asp_start_prob", f_asp_start_prob)
 
         #print(batch_dict['forward_asp_answer_start'])
+        
+        sentence_preprocess = preprocess(tokenizer.convert_ids_to_tokens(ok_start_tokens)) 
+        sentence_pos = nlp.pos_tag(sentence_preprocess)
+        sentence_dep_parse = nlp.dependancy_parse(sentence_preprocess)
 
         f_asp_start_prob_temp = []
         f_asp_end_prob_temp = []
@@ -207,7 +251,7 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
             opinion_query_seg = [0] * len(opinion_query)
             f_opi_length = len(opinion_query)
             
-            sentence_representation = batch_dict['sentence_representation'][0]
+            sentence_representation = get_sentence_representation(sentence_pos, sentence_dep_parse)
             forward_opi_template = [0] * len(opinion_query)
             forward_opi_prob = get_restrictive_forward_opinion(ok_start_tokens,
                 sentence_representation, aspects_list)
