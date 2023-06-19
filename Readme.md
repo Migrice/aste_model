@@ -23,8 +23,8 @@ Put it into different directories (./data/original/[v1, v2]) according to the ve
 You must download the stanfordNLP to get POS from https://stanfordnlp.github.io/CoreNLP/index.html by following these steps:
 
 ```
-    - wget http://nlp.stanford.edu/software/stanford-corenlp-latest.zip
-    - unzip stanford-corenlp-latest.zip
+    - wget http://nlp.stanford.edu/software/stanford-corenlp-4.5.4.zip
+    - unzip stanford-corenlp-4.5.4.zip
     - cd stanford-corenlp-4.5.4
     - for file in `find . -name "*.jar"`; do export
 CLASSPATH="$CLASSPATH:`realpath $file`"; done

@@ -92,38 +92,41 @@ def get_sentence_representation(pos_tag, dependancy_parse):
 
 
 def get_restrictive_forward_opinion(ok_start_tokens,sentence_representation, aspects_list):
+    
     sentence = tokenizer.convert_ids_to_tokens(ok_start_tokens)
     cible_list = []
+    probability_list = []
     vector_prob_output = [0] * len(ok_start_tokens)
     for i in range(len(sentence_representation)):
         if sentence_representation[i].get("mot") in aspects_list:
             if sentence_representation[i].get("forward_opinion_prob"):
                 cible_list.append(sentence_representation[i].get("cible"))
-    
+                probability_list.append(sentence_representation[i].get("forward_opinion_prob"))
     for i in range(len(sentence)):
-        if sentence[i] in cible_list:
-            for j in range(len(sentence_representation)):
-                if sentence[i] == sentence_representation[j].get("cible"):
-                    vector_prob_output[i] = sentence_representation[j].get(
-                        "forward_opinion_prob")
+        for j in range (len(cible_list)) : 
+            if sentence[i] == cible_list[j]:
+                vector_prob_output[i] = probability_list[j]
     return vector_prob_output
 
 
 def get_restrictive_backward_aspect(ok_start_tokens, sentence_representation, opinion_list):
+    
     sentence = tokenizer.convert_ids_to_tokens(ok_start_tokens)
     cible_list = []
+    probability_list = []
     vector_prob_output = [0] * len(ok_start_tokens)
     for i in range(len(sentence_representation)):
         if sentence_representation[i].get("mot") in opinion_list:
             if sentence_representation[i].get("backward_aspect_prob"):
                 cible_list.append(sentence_representation[i].get("cible"))
+                probability_list.append(sentence_representation[i].get(
+                        "backward_aspect_prob"))
+                
 
     for i in range(len(sentence)):
-        if sentence[i] in cible_list:
-            for j in range(len(sentence_representation)):
-                if sentence[i] == sentence_representation[j].get("cible"):
-                    vector_prob_output[i] = sentence_representation[j].get(
-                        "backward_aspect_prob")
+        for j in range(len(cible_list)):
+            if sentence[i] == cible_list[j]:
+                vector_prob_output[i] = probability_list[j]
     return vector_prob_output
 
 
@@ -210,7 +213,7 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
         
         sentence_preprocess = preprocess(tokenizer.convert_ids_to_tokens(ok_start_tokens)) 
         sentence_pos = nlp.pos_tag(sentence_preprocess)
-        sentence_dep_parse = nlp.dependancy_parse(sentence_preprocess)
+        sentence_dep_parse = nlp.dependency_parse(sentence_preprocess)
 
         f_asp_start_prob_temp = []
         f_asp_end_prob_temp = []
@@ -285,7 +288,6 @@ def test(model, tokenizer, batch_generator, test_data, beta, logger, gpu, max_le
 
             f_opi_start_scores, f_opi_end_scores = model(
                 opinion_query, opinion_query_mask, opinion_query_seg, 'AO')
-            
             for i in range(len(f_opi_start_scores)):
                     for j in range(len(f_opi_start_scores[0])):
                         f_opi_start_scores[i][j][1] += forward_opinion_prob[j]

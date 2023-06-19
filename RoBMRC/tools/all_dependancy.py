@@ -122,8 +122,8 @@ def data_get_roles():
             text_lines = file.readlines()
             data_preprocessed, good_aspects_roles, initial_asp_roles, all_roles, good_opi_rol = train_data_get_rel(
                 text_lines)
-            with open("../asp_opi_rel" + "/" + dataset_type + ".txt", "w+") as f:
-                f.write("\n" + str(data_preprocessed))
+            # with open("../asp_opi_rel" + "/" + dataset_type + ".txt", "w+") as f:
+            #     f.write("\n" + str(data_preprocessed))
             total_good_roles = total_good_roles + good_aspects_roles
             total_all_roles = total_all_roles + all_roles
             total_good_opinion_roles = total_good_opinion_roles + good_opi_rol

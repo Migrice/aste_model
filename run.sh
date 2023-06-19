@@ -13,4 +13,4 @@ echo "Preprocess Data"
 python ./tools/dataProcessV2.py
 
 echo "Begin Training"
-python ./tools/main.py --mode train 
+python ./tools/main.py --mode train  --epoch_num 1 
